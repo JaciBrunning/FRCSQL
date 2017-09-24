@@ -12,6 +12,14 @@ def loaddata file
     ret
 end
 
+def run sym, &block
+    if ARGV.select { |x| x.include?("only_") }
+        yield if ARGV.include?("only_#{sym.to_s}")
+    else
+        yield unless ARGV.include?("skip_#{sym.to_s}")
+    end
+end
+
 create_db @db
 
 class District < Sequel::Model(@db[:districts])
@@ -117,16 +125,18 @@ def write_location obj, model
     obj.save
 end
 
-@districts = loaddata "district"
-puts "Writing District Data..."
-@db.transaction do
-    @districts.each do |d|
-        District.create(key: d["__key__"]["name"], display_name: d["display_name"],
-            abbrev: d["abbreviation"], year: d["year"].to_i)
+run :districts do
+    @districts = loaddata "district"
+    puts "Writing District Data..."
+    @db.transaction do
+        @districts.each do |d|
+            District.find_or_create(key: d["__key__"]["name"], display_name: d["display_name"],
+                abbrev: d["abbreviation"], year: d["year"].to_i)
+        end
     end
+    puts "Done!"
+    @districts = nil
 end
-puts "Done!"
-@districts = nil
 
 EVENTTYPES = {
     0 => "Regional",
@@ -140,74 +150,117 @@ EVENTTYPES = {
     100 => "Week 0"
 }
 
-@db.transaction do
-    EVENTTYPES.each do |key, value|
-        EventType.create(id: key, type: value)
-    end
-end
-
-@events = loaddata "event"
-puts "Writing Event Data..."
-@db.transaction do
-    @events.each do |e|
-        event = Event.create(key: e["__key__"]["name"], code: e["event_short"],
-            event_type: EventType[e["event_type_enum"]], name: e["name"],
-            short_name: e["short_name"], official: e["official"],
-            website: e["website"], playoff_type: e["playoff_type"],
-            year: e["year"], start_date: e["start_date"], end_date: e["end_date"] )
-        write_location event, e
-        unless e["district_key"].nil? || e["district_key"]["name"].nil?
-            event.district = District.first(key: e["district_key"]["name"])
-            event.save
-        end
-
-        # TODO: Alliance Selections, Event Stats
-    end
-end
-puts "Solving Event Dependencies..."
-@db.transaction do
-    @events.each do |e|
-        unless e["parent_event"].nil? || e["parent_event"]["name"].nil?
-            event = Event.first(key: e["__key__"]["name"])
-            event.parent = Event.first(key: e["parent_event"]["name"])
-            event.save
+run :events do
+    @db.transaction do
+        EVENTTYPES.each do |key, value|
+            EventType.find_or_create(id: key, type: value)
         end
     end
-end
-puts "Done!"
-@events = nil
 
-@teams = loaddata "team"
-puts "Writing Team Data..."
-@db.transaction do
-    @teams.each do |t|
-        team = Team.create(key: t["__key__"]["name"], number: t["team_number"],
-            nickname: t["nickname"], name: t["name"], motto: t["motto"],
-            school_name: t["school_name"], website: t["website"], rookie_year: t["rookie_year"],
-            home_championship: t["home_cmp"])
-        write_location team, t
+    @events = loaddata "event"
+    puts "Writing Event Data..."
+    @db.transaction do
+        @events.each do |e|
+            event = Event.find_or_create(key: e["__key__"]["name"], code: e["event_short"],
+                event_type: EventType[e["event_type_enum"]], name: e["name"],
+                short_name: e["short_name"], official: e["official"],
+                website: e["website"], playoff_type: e["playoff_type"],
+                year: e["year"], start_date: e["start_date"], end_date: e["end_date"] )
+            write_location event, e
+            unless e["district_key"].nil? || e["district_key"]["name"].nil?
+                event.district = District.first(key: e["district_key"]["name"])
+                event.save
+            end
+
+            # TODO: Alliance Selections, Event Stats
+        end
     end
-end
-puts "Done!"
-@teams = nil
-
-@dts = loaddata "districtTeam"
-puts "Writing District Teams..."
-@db.transaction do
-    @dts.each do |dt|
-        Team.first(key: dt["team"]["name"]).add_district(District.first(key: dt["district_key"]["name"]))
+    puts "Solving Event Dependencies..."
+    @db.transaction do
+        @events.each do |e|
+            unless e["parent_event"].nil? || e["parent_event"]["name"].nil?
+                event = Event.first(key: e["__key__"]["name"])
+                event.parent = Event.first(key: e["parent_event"]["name"])
+                event.save
+            end
+        end
     end
+    puts "Done!"
+    @events = nil
 end
-puts "Done!"
-@dts = nil
 
-@ets = loaddata "eventTeam"
-puts "Writing Event Teams..."
-@db.transaction do
-    @ets.each do |et|
-        Team.first(key: et["team"]["name"]).add_event(Event.first(key: et["event"]["name"]))
+run :teams do
+    @teams = loaddata "team"
+    puts "Writing Team Data..."
+    @db.transaction do
+        @teams.each do |t|
+            team = Team.find_or_create(key: t["__key__"]["name"], number: t["team_number"],
+                nickname: t["nickname"], name: t["name"], motto: t["motto"],
+                school_name: t["school_name"], website: t["website"], rookie_year: t["rookie_year"],
+                home_championship: t["home_cmp"])
+            write_location team, t
+        end
     end
+    puts "Done!"
+    @teams = nil
 end
-puts "Done!"
-@ets = nil
 
+run :district_teams do
+    @dts = loaddata "districtTeam"
+    puts "Writing District Teams..."
+    @db.transaction do
+        @dts.each do |dt|
+            Team.first(key: dt["team"]["name"]).add_district(District.first(key: dt["district_key"]["name"]))
+        end
+    end
+    puts "Done!"
+    @dts = nil
+end
+
+run :event_teams do
+    @ets = loaddata "eventTeam"
+    puts "Writing Event Teams... (This may take a while)"
+    @db.transaction do
+        @ets.each do |et|
+            Team.first(key: et["team"]["name"]).add_event(Event.first(key: et["event"]["name"]))
+        end
+    end
+    puts "Done!"
+    @ets = nil
+end
+
+run :awards do
+    @awards = loaddata "award"
+    puts "Writing Awards... (This may take a while)"
+    @db.transaction do
+        @awards.each do |a|
+            type = AwardType.find_or_create(name: a["name_str"])
+            recip_list = a["recipient_json_list"].map { |x| JSON.parse(x)}
+            recip_list.each do |recip|
+                aw = Award.new(type: type, event: Event.first(key: a["event"]["name"]),
+                    awardee: recip["awardee"])
+                aw.team = Team.first(number: recip["team_number"])
+                aw.save
+            end
+        end
+    end
+    puts "Done!"
+    @awards = nil
+end
+
+run :matches do
+    @matches = loaddata "matches"
+    puts "Writing Matches... (This may take a while)"
+    @db.transaction do
+        @matches.each do |m|
+
+        end
+    end
+    puts "Solving Match Dependencies..."
+    @db.transaction do
+        @matches.each do |m|
+        end
+    end
+    puts "Done!"
+    @matches = nil
+end
