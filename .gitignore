@@ -1,1 +1,4 @@
 data/
+frc_db.sqlite
+preprocess/out
+preprocess/preprocess
