@@ -3,7 +3,7 @@ mod :event_teams, [:teams, :events] do
     puts "Writing Event Teams... (This may take a while)"
     @db.transaction do
         @ets.each do |et|
-            Team.first(key: et["team"]["name"]).add_event(Event.first(key: et["event"]["name"]))
+            Team[et["team"]["name"]].add_event(Event[et["event"]["name"]])
         end
     end
     puts "Done!"

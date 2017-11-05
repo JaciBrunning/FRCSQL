@@ -8,8 +8,13 @@ require_relative 'create_db'
 @db = Sequel.connect('postgres://test:test@localhost/tbadump')
 create_db @db
 
+def reinit_tables
+    create_db @db
+end
+
 # Models
 class District < Sequel::Model(@db[:districts])
+    unrestrict_primary_key
 end
 
 class EventType < Sequel::Model(@db[:event_types])
@@ -17,6 +22,7 @@ class EventType < Sequel::Model(@db[:event_types])
 end
 
 class Event < Sequel::Model(@db[:events])
+    unrestrict_primary_key
     many_to_one :district
     many_to_one :parent, class: self
     many_to_one :event_type
@@ -40,6 +46,7 @@ class TeamEventStat < Sequel::Model(@db[:team_event_stats])
 end
 
 class Match < Sequel::Model(@db[:matches])
+    unrestrict_primary_key
     many_to_one :event
     many_to_one :tiebreaker_match, class: self    
 end
@@ -144,13 +151,20 @@ def puts str="", indent=1
     _puts "#{"\t" * indent}#{str}"
 end
 
+def should_run_module? mod
+    return false if ARGV.select { |x| x.start_with?("-I") }.size > 0 && !ARGV.include?("-I#{mod}")
+    return !ARGV.include?("-X#{mod}")
+end
+
 def loadmodules
     Dir["generation_modules/*.rb"].each { |file| require_relative file }
 
     toposort.each do |x|
-        if !ARGV.select { |y| y.include?("all") || y.include?(x[:name].to_s) }.empty? || ARGV.empty?  
+        if should_run_module? x[:name]
             puts "-> Running #{x[:name].to_s}...", 0
-            x[:action].call() 
+            start = Time.now
+            x[:action].call()
+            puts "-> Took #{(Time.now - start).to_s} seconds" 
             puts
         end
     end

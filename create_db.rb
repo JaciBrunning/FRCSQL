@@ -1,7 +1,6 @@
 def create_db db
     db.create_table? :districts do
-        primary_key :id
-        String :key, null: :false, unique: true
+        primary_key :id, type: String
         String :display_name, null: false
         String :abbrev, null: false
         Integer :year, null: false
@@ -13,10 +12,9 @@ def create_db db
     end
 
     db.create_table? :events do
-        primary_key :id
-        foreign_key :parent_id, :events, null: true, on_delete: :set_null       # Optional: Parent Event (i.e. championships and divisions)
-        foreign_key :district_id, :districts, null: true, on_delete: :set_null  # Optional: District for the Event
-        String :key, null: false, unique: true
+        primary_key :id, type: String
+        foreign_key :parent_id, :events, type: String, null: true, on_delete: :set_null       # Optional: Parent Event (i.e. championships and divisions)
+        foreign_key :district_id, :districts, type: String, null: true, on_delete: :set_null  # Optional: District for the Event
         String :code
         foreign_key :event_type_id, :event_types, on_delete: :cascade
         String :name
@@ -41,8 +39,8 @@ def create_db db
     end
 
     db.create_table? :teams do
-        primary_key :number, null: false, unique: true
-        String :key, null: false, unique: true
+        primary_key :id, type: String
+        Int :number
         String :home_championship
         String :nickname
         String :name
@@ -63,41 +61,38 @@ def create_db db
     end
 
     db.create_table? :districts_teams do
-        foreign_key :district_id, :districts, on_delete: :cascade
-        foreign_key :team_id, :teams, on_delete: :cascade
+        foreign_key :district_id, :districts, type: String, on_delete: :cascade
+        foreign_key :team_id, :teams, type: String, on_delete: :cascade
         primary_key [:district_id, :team_id]
     end
 
     db.create_table? :events_teams do
-        foreign_key :event_id, :events, on_delete: :cascade
-        foreign_key :team_id, :teams, on_delete: :cascade
-        primary_key [:event_id, :team_id]
+        foreign_key :event_id, :events, type: String, on_delete: :cascade
+        foreign_key :team_id, :teams, type: String, on_delete: :cascade
+        primary_key [:event_id, :team_id]  
     end
 
     db.create_table? :alliance_selections do
-        primary_key :id
-        foreign_key :event_id, :events, on_delete: :cascade
-        foreign_key :team_id, :teams, on_delete: :cascade
+        foreign_key :event_id, :events, type: String, on_delete: :cascade
+        foreign_key :team_id, :teams, type: String, on_delete: :cascade
         Integer :alliance
         Integer :picknum
-        unique [:event_id, :team_id, :alliance]
+        primary_key [:event_id, :team_id, :alliance]
     end
 
     db.create_table? :team_event_stats do
-        primary_key :id
-        foreign_key :event_id, :events, on_delete: :cascade
-        foreign_key :team_id, :teams, on_delete: :cascade
+        foreign_key :event_id, :events, type: String, on_delete: :cascade
+        foreign_key :team_id, :teams, type: String, on_delete: :cascade
         String :stat_type
         Float :value
-        unique [:event_id, :team_id, :stat_type]
+        primary_key [:event_id, :team_id, :stat_type]
     end
 
     db.create_table? :matches do
-        primary_key :id
-        foreign_key :event_id, :events, on_delete: :cascade
-        foreign_key :tiebreaker_match_id, :matches, null: true, on_delete: :set_null  # Optional: Tiebreaker Match
+        primary_key :id, type: String        
+        foreign_key :event_id, :events, type: String, on_delete: :cascade
+        foreign_key :tiebreaker_match_id, :matches, type: String, null: true, on_delete: :set_null  # Optional: Tiebreaker Match
 
-        String :match_key
         String :comp_level
         Integer :match_num
         Integer :set_num
@@ -109,32 +104,32 @@ def create_db db
     end
 
     db.create_table? :match_alliances do
-        primary_key :id
-        foreign_key :match_id, :matches, on_delete: :cascade
+        primary_key :id, type: String
+        foreign_key :match_id, :matches, type: String, on_delete: :cascade, deferrable: true
         String :color
+        Float :score
         unique [:match_id, :color]
     end
 
     db.create_table? :matches_teams do
-        foreign_key :team_id, :teams, on_delete: :cascade
-        foreign_key :alliance_id, :match_alliances, on_delete: :cascade
+        # We don't use a team FK here since some teams that compete in offseason events aren't official teams
+        foreign_key :team_id, type: String
+        foreign_key :alliance_id, :match_alliances, type: String, on_delete: :cascade, deferrable: true
         primary_key [:team_id, :alliance_id]
     end
 
     db.create_table? :score_types do
         primary_key :id
-        Integer :year
-        String :name
-        unique [:year, :name]
+        String :name, unique: true
     end
 
     db.create_table? :match_scores do
-        primary_key :id
-        foreign_key :match_id, :matches, on_delete: :cascade
-        foreign_key :alliance_id, :match_alliances, on_delete: :cascade
-        foreign_key :type_id, :score_types, on_delete: :cascade
-        Integer :value
-        unique [:match_id, :alliance_id, :type_id]
+        foreign_key :alliance_id, :match_alliances, type: String, on_delete: :cascade, deferrable: true
+        foreign_key :type_id, :score_types, on_delete: :cascade, deferrable: true
+        String :value_str, null: true
+        Float :value_num, null: true
+        Boolean :value_bool, null: true
+        primary_key [:alliance_id, :type_id]
     end
 
     db.create_table? :award_types do
@@ -145,8 +140,8 @@ def create_db db
     db.create_table? :awards do
         primary_key :id
         foreign_key :type_id, :award_types, on_delete: :cascade
-        foreign_key :event_id, :events, on_delete: :cascade
-        foreign_key :team_id, :teams, null: true, on_delete: :cascade
+        foreign_key :event_id, :events, type: String, on_delete: :cascade
+        foreign_key :team_id, :teams, type: String, null: true, on_delete: :cascade
         String :awardee
         unique [:type_id, :event_id, :awardee, :team_id]
     end

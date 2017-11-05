@@ -10,9 +10,9 @@ mod :awards, [:teams, :events] do
             type = AwardType.find_or_create(name: a["name_str"])
             recip_list = a["recipient_json_list"].map { |x| JSON.parse(x)}
             recip_list.each do |recip|
-                aw = Award.new(type: type, event: Event.first(key: a["event"]["name"]),
+                aw = Award.new(type: type, event: Event[a["event"]["name"]],
                     awardee: recip["awardee"])
-                aw.team = Team.first(number: recip["team_number"].to_i)
+                aw.team = Team[ "frc#{recip["team_number"]}" ] unless recip["team_number"].nil?
                 aw.save
             end
         end

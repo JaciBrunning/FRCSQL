@@ -6,7 +6,7 @@ mod :districts do
     puts "Writing District Data..."
     @db.transaction do
         @districts.each do |d|
-            District.find_or_create(key: d["__key__"]["name"], display_name: d["display_name"],
+            District.find_or_create(id: d["__key__"]["name"], display_name: d["display_name"],
                 abbrev: d["abbreviation"], year: d["year"].to_i)
         end
     end
