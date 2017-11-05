@@ -8,7 +8,7 @@ mod :matches, [:events, :teams] do
     reinit_tables
 
     puts "Running Native Code"
-    system('bash', '-c', 'pushd native; ./matches; popd', out: $stdout, err: :out)
+    system('bash', '-c', 'pushd native; ./build.sh; ./matches; popd', out: $stdout, err: :out)
 
     puts "Done!"
     @matches = nil

@@ -155,4 +155,8 @@ def create_db db
     # @db.create_table? :rankings
 
     # end
+
+    # TODO: Match Stats
+    # @db.create_table? :oprs
+    # end
 end

@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -13,7 +14,6 @@ using namespace rapidjson;
 const std::string DELIM = ",";
 #define STR(x) (std::string(x.GetString()))
 #define STR_OR_NULL(d, i) ( !d.HasMember(i) ? "null" : d[i].IsNull() ? "null" : std::string(d[i].GetString()) )
-
 
 int main() {
     std::ifstream ifs("../data/match.json");
@@ -31,6 +31,7 @@ int main() {
     C.prepare("match", "INSERT INTO matches (id, event_id, comp_level, match_num, set_num, scheduled_time, predicted_time, actual_time, results_time) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING");
     C.prepare("match_tiebreakers", "UPDATE matches SET tiebreaker_match_id = $1 WHERE id = $2");
     C.prepare("alliance", "INSERT INTO match_alliances (id, match_id, color, score) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING");
+    C.prepare("teams", "INSERT INTO match_teams (team_id, alliance_id) VALUES ($1, $2) ON CONFLICT DO NOTHING");
     C.prepare("score_lookup", "INSERT INTO score_types (id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING");
     C.prepare("score", "INSERT INTO match_scores (alliance_id, type_id, value_str, value_num, value_bool) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING");
 
@@ -48,9 +49,10 @@ int main() {
                     act_time = STR_OR_NULL(d, "actual_time"), 
                     res_time = STR_OR_NULL(d, "post_result_time");
 
+        std::string event_name = STR(d["event"]["name"]);
         W->prepared("match")
             (match_key)
-            (STR(d["event"]["name"]))
+            (event_name)
             (STR_OR_NULL(d, "comp_level"))
             (STR_OR_NULL(d, "match_number"))
             (STR_OR_NULL(d, "set_number"))
@@ -62,13 +64,15 @@ int main() {
         for (auto it = alliances.MemberBegin(); it != alliances.MemberEnd(); it++) {
             std::string key = STR(it->name);
             Value &teams = (it->value)["teams"];
-            Value &score_key = it->value["score"];
-            double score = (score_key.IsNumber() ? score_key.GetDouble() : 0);
+            Value &score_key = (it->value)["score"];
+            
+            double score = (score_key.IsNumber() ? score_key.GetDouble() : score_key.IsString() ? atof(score_key.GetString()) : 0);
             std::string alliance = key.substr(0, 1);
             std::string fullkey = match_key + "_" + alliance;
             W->prepared("alliance")(fullkey)(match_key)(alliance)(score).exec();
             for (SizeType i = 0; i < teams.Size(); i++) {
                 Value &team = teams[i];
+                W->prepared("teams")(team.GetString())(fullkey);
             }
         }
 
