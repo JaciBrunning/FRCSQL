@@ -5,7 +5,7 @@ require 'sequel'
 require_relative 'create_db'
 
 # @db = Sequel.connect("sqlite:///#{Dir.pwd}/frc_db.sqlite")
-@db = Sequel.connect('postgres://test:test@localhost/tbadump')
+@db = Sequel.connect('postgres://test:test@localhost/frcsql')
 create_db @db
 
 def reinit_tables

@@ -25,7 +25,7 @@ int main() {
 
     int i = 0;
 
-    pqxx::connection C("postgres://test:test@localhost/tbadump");
+    pqxx::connection C("postgres://test:test@localhost/frcsql");
     pqxx::work *W = new pqxx::work(C);
 
     C.prepare("match", "INSERT INTO matches (id, event_id, comp_level, match_num, set_num, scheduled_time, predicted_time, actual_time, results_time) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING");
